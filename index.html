@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Local Media Gallery</title>
+  <style>
+    :root {
+      --bg: #0b0c10;
+      --panel: #111217;
+      --text: #e6e6e6;
+      --muted: #a0a0a0;
+      --accent: #4f46e5;
+      --accent-2: #22d3ee;
+      --border: #23242c;
+      --tile: #151722;
+      --shadow: 0 6px 24px rgba(0,0,0,.35);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0; padding: 0;
+      background: linear-gradient(180deg, #0b0c10 0%, #0e1018 100%);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    }
+    header { position: sticky; top: 0; z-index: 20; backdrop-filter: blur(8px); background: rgba(11,12,16,.6); border-bottom: 1px solid var(--border); }
+    .container { max-width: 1200px; margin: 0 auto; padding: 12px 16px; }
+
+    .title { display: flex; align-items: center; gap: 10px; padding: 8px 0 12px; }
+    .title h1 { font-size: 20px; margin: 0; letter-spacing: .2px; }
+    .badge { font-size: 12px; padding: 2px 8px; background: #0f172a; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); }
+
+    .tabs { display: flex; gap: 8px; flex-wrap: wrap; padding-bottom: 10px; }
+    .tab-btn {
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, #151823, #121521);
+      color: var(--text);
+      padding: 8px 10px; border-radius: 10px;
+      cursor: pointer; box-shadow: var(--shadow);
+      display: inline-flex; align-items: center; gap: 8px;
+      transition: transform .08s ease, border-color .15s ease, box-shadow .15s ease;
+    }
+    .tab-btn:hover { transform: translateY(-1px); border-color: #2a2d3a; }
+    .tab-btn.active { outline: 2px solid var(--accent); }
+    .tab-name { font-weight: 600; }
+    .tab-count { font-size: 12px; color: var(--muted); background: #0b0d14; border: 1px solid var(--border); padding: 2px 6px; border-radius: 999px; }
+
+    main { max-width: 1200px; margin: 0 auto; padding: 16px; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    .grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
+    .tile {
+      position: relative; background: var(--tile); border: 1px solid var(--border);
+      border-radius: 16px; overflow: hidden; aspect-ratio: 1 / 1; box-shadow: var(--shadow);
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: transform .08s ease, border-color .15s ease, box-shadow .15s ease;
+    }
+    .tile:hover { transform: translateY(-2px); border-color: #2a2d3a; }
+    .tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    /* 動画タイル */
+    .video .video-thumb {
+      width: 100%; height: 100%; display: grid; place-items: center;
+      background: radial-gradient(60% 60% at 50% 50%, rgba(34,211,238,.08) 0%, rgba(79,70,229,.08) 100%), #0d101a;
+    }
+    .video .filename { position: absolute; left: 8px; bottom: 8px; font-size: 12px; color: var(--muted); background: rgba(0,0,0,.45); padding: 2px 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,.1); }
+    .play-icon {
+      width: 54px; height: 54px; border-radius: 999px; border: 2px solid rgba(255,255,255,.7);
+      display: grid; place-items: center; box-shadow: 0 0 0 6px rgba(255,255,255,.08);
+    }
+    .play-icon::before {
+      content: ""; display: block; width: 0; height: 0;
+      border-left: 16px solid rgba(255,255,255,.9);
+      border-top: 10px solid transparent; border-bottom: 10px solid transparent;
+      margin-left: 4px;
+    }
+
+    /* ビューア（モーダル） */
+    .viewer {
+      position: fixed; inset: 0; background: rgba(3,6,12,.9);
+      display: none; align-items: center; justify-content: center; padding: 24px; z-index: 50;
+    }
+    .viewer.active { display: flex; }
+    .viewer .inner { position: relative; max-width: 96vw; max-height: 90vh; width: min(1200px, 96vw); }
+    .viewer .frame { background: #000; border-radius: 16px; overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow); }
+    .viewer img, .viewer video { display: block; max-width: 100%; max-height: 80vh; margin: 0 auto; }
+    .viewer .close { position: absolute; top: -12px; right: -12px; background: #0f172a; color: #fff; border: 1px solid var(--border); border-radius: 999px; width: 36px; height: 36px; display: grid; place-items: center; cursor: pointer; box-shadow: var(--shadow); }
+    .viewer .meta { margin-top: 10px; text-align: center; color: var(--muted); font-size: 13px; }
+
+    footer { max-width: 1200px; margin: 32px auto 48px; padding: 0 16px; color: var(--muted); font-size: 12px; text-align: center; }
+    a, a:visited { color: var(--accent-2); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="title">
+        <h1>Local Media Gallery</h1>
+        <span class="badge">static / generated</span>
+      </div>
+      <nav class="tabs" role="tablist" aria-label="Folders">
+        <button class="tab-btn" role="tab" data-target="artist1"><span class="tab-name">artist1</span><span class="tab-count">3</span></button><button class="tab-btn" role="tab" data-target="artist2"><span class="tab-name">artist2</span><span class="tab-count">2</span></button>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section id="artist1" class="panel" role="tabpanel" aria-labelledby="tab-artist1">
+  <ul class="grid">
+    <li class="tile" data-kind="image" data-src="media/artist1/01.png" aria-label="01.png">
+  <img src="media/artist1/01.png" alt="01.png" loading="lazy" />
+</li>
+    <li class="tile" data-kind="image" data-src="media/artist1/02.png" aria-label="02.png">
+  <img src="media/artist1/02.png" alt="02.png" loading="lazy" />
+</li>
+    <li class="tile" data-kind="image" data-src="media/artist1/03.png" aria-label="03.png">
+  <img src="media/artist1/03.png" alt="03.png" loading="lazy" />
+</li>
+  </ul>
+</section><section id="artist2" class="panel" role="tabpanel" aria-labelledby="tab-artist2">
+  <ul class="grid">
+    <li class="tile video" data-kind="video" data-src="media/artist2/01.mp4" aria-label="01.mp4">
+  <div class="video-thumb" title="01.mp4">
+    <div class="play-icon" aria-hidden="true"></div>
+    <div class="filename">01.mp4</div>
+  </div>
+</li>
+    <li class="tile" data-kind="image" data-src="media/artist2/02.jpg" aria-label="02.jpg">
+  <img src="media/artist2/02.jpg" alt="02.jpg" loading="lazy" />
+</li>
+  </ul>
+</section>
+  </main>
+
+  <div id="viewer" class="viewer" aria-hidden="true">
+    <div class="inner">
+      <button class="close" aria-label="Close">✕</button>
+      <div class="frame"></div>
+      <div class="meta"></div>
+    </div>
+  </div>
+
+  <footer>
+    生成物: <code>index.html</code> ・ メディアは <code>media/</code> 配下の各フォルダへ入れるだけ
+  </footer>
+
+<script>
+(function(){
+  const $ = (sel, root=document) => root.querySelector(sel);
+  const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+
+  // タブ切り替え
+  const tabs = $$('.tab-btn');
+  const panels = $$('.panel');
+  const KEY = 'gallery:lastTab';
+
+  function activate(slug) {
+    tabs.forEach(btn => btn.classList.toggle('active', btn.dataset.target === slug));
+    panels.forEach(p => p.classList.toggle('active', p.id === slug));
+    localStorage.setItem(KEY, slug);
+  }
+
+  tabs.forEach(btn => btn.addEventListener('click', () => activate(btn.dataset.target)));
+
+  // 初期アクティブ（ローカルストレージ優先）
+  const initial = localStorage.getItem(KEY) || 'artist1';
+  if (initial) activate(initial);
+
+  // ビューア（モーダル）
+  const viewer = $('#viewer');
+  const frame = $('.frame', viewer);
+  const meta = $('.meta', viewer);
+  const closeBtn = $('.close', viewer);
+
+  function openViewer(kind, src, name) {
+    frame.innerHTML = '';
+    meta.textContent = name || '';
+    if (kind === 'image') {
+      const img = new Image();
+      img.src = src; img.alt = name || '';
+      img.loading = 'eager';
+      frame.appendChild(img);
+    } else if (kind === 'video') {
+      const v = document.createElement('video');
+      v.src = src; v.controls = true; v.autoplay = true; v.playsInline = true;
+      frame.appendChild(v);
+    }
+    viewer.classList.add('active');
+    viewer.setAttribute('aria-hidden', 'false');
+  }
+
+  function closeViewer() {
+    viewer.classList.remove('active');
+    viewer.setAttribute('aria-hidden', 'true');
+    frame.innerHTML = '';
+  }
+
+  closeBtn.addEventListener('click', closeViewer);
+  viewer.addEventListener('click', (e) => { if (e.target === viewer) closeViewer(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeViewer(); });
+
+  // タイルクリックで開く
+  $$('.grid .tile').forEach(tile => {
+    tile.addEventListener('click', () => {
+      const kind = tile.dataset.kind;
+      const src  = tile.dataset.src;
+      const name = tile.getAttribute('aria-label') || '';
+      openViewer(kind, src, name);
+    });
+  });
+})();
+
+</script>
+</body>
+</html>
